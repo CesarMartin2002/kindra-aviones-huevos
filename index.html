@@ -286,6 +286,7 @@ canvas { display:block; width:100%; height:100%; image-rendering:pixelated; }
       <span class="lbl">PUNTUACIÓN</span>
       <span class="val" id="finalScore">0</span>
       <span class="best" id="bestScore"></span>
+      <p id="fcasMsg" style="display:none;font-size:10px;letter-spacing:1px;color:#ffcc44;text-align:center;max-width:280px;line-height:1.7;margin-top:8px;">Pero a dónde vas si todavía no has terminado tu proyecto, Hernán? Cuando desatasques este avión ya juegas.</p>
     </div>
     <div class="menu-btns" id="menuBtns">
       <button class="menu-btn" id="btnHangar">✈ HANGAR</button>
@@ -422,39 +423,71 @@ const PLANES = [
     abilityEmoji: '🛡',
     stats: { maxHp: 110, speed: 4.0, fireRate: 280, bulletPattern: 'standard', abilityMax: 360 }
   },
+  {
+    id: 'f37',
+    name: 'F-37',
+    role: 'Variante Clasificada',
+    secret: true,
+    color: '#aaaaff',
+    trailColor: '#8888ee',
+    desc: 'Variante ultrasecreta del F-22 Raptor. Activa el modo de visualización alternativo.',
+    ability: 'STEALTH',
+    abilityEmoji: '👁',
+    stats: { maxHp: 90, speed: 5.0, fireRate: 220, bulletPattern: 'standard', abilityMax: 1 }
+  },
+  {
+    id: 'fcas',
+    name: 'FCAS',
+    role: 'Proyecto Europeo',
+    secret: true,
+    color: '#4488ff',
+    trailColor: '#2255cc',
+    desc: 'El Future Combat Air System europeo. Todavía en desarrollo.',
+    ability: '???',
+    abilityEmoji: '🔧',
+    stats: { maxHp: 100, speed: 4.5, fireRate: 200, bulletPattern: 'standard', abilityMax: 300 }
+  },
+  {
+    id: 'f-golden',
+    name: 'F-GOLDEN',
+    role: 'Avión Definitivo',
+    secret: true,
+    color: '#ffd700',
+    trailColor: '#ffaa00',
+    desc: 'La aeronave definitiva. Combina todas las ventajas de cada avión en un único aparato legendario.',
+    ability: 'TODO A LA VEZ',
+    abilityEmoji: '👑',
+    stats: { maxHp: 200, speed: 6.5, fireRate: 160, bulletPattern: 'spread', abilityMax: 350 }
+  },
+  {
+    id: 'bombardino',
+    name: 'Bombardino Cocodrilo',
+    role: 'Bestia Anfibia',
+    secret: true,
+    color: '#44bb44',
+    trailColor: '#228822',
+    desc: 'El legendario Bombardino Cocodrilo. Tanque volador con alma de reptil y presencia sonora aplastante.',
+    ability: 'RÁFAGA 360°',
+    abilityEmoji: '🐊',
+    stats: { maxHp: 200, speed: 3.2, fireRate: 380, bulletPattern: 'heavy', abilityMax: 300 }
+  },
 ];
 
 // ═══════════════════════════════════════════════
-// PLANE IMAGES — reemplaza la silueta canvas si se provee base64
-// Para cambiar la foto de un avión, pon aquí su base64 completo:
-//   data:image/png;base64,iVBORw0KGgo...
-// Si el string está vacío, se usa la silueta vectorial por defecto.
+// PLANE IMAGES — carga desde static/images/{id}.png
+// Si el archivo no existe (404), se usa la silueta vectorial por defecto.
 // ═══════════════════════════════════════════════
-const PLANE_IMAGES = {
-  f18:          '', // Ej: 'data:image/png;base64,ABC123...'
-  eurofighter:  '',
-  f22:          '',
-  aviojeta:     '',
-  a400m:        '',
-  c295:         '',
-};
-
-// Cache de objetos Image. Se precargan todos al inicio.
 const _imgCache = {};
 function preloadPlaneImages(onAllDone) {
-  const ids = Object.keys(PLANE_IMAGES);
-  let pending = 0;
+  const ids = PLANES.map(p => p.id);
+  let pending = ids.length;
+  if (pending === 0) { if(onAllDone) onAllDone(); return; }
   ids.forEach(id => {
-    const b64 = PLANE_IMAGES[id];
-    if (!b64) return;
-    pending++;
     const img = new Image();
     img.onload  = () => { _imgCache[id] = img; pending--; if(pending===0 && onAllDone) onAllDone(); };
     img.onerror = () => { pending--; if(pending===0 && onAllDone) onAllDone(); };
-    img.src = b64;
+    img.src = 'static/images/' + id + '.png';
   });
-  // Si no hay ninguna imagen que cargar, llamar callback inmediatamente
-  if(pending===0 && onAllDone) onAllDone();
 }
 function getPlaneImage(id) {
   return _imgCache[id] || null;
@@ -525,6 +558,79 @@ function sfxLevelUp() {
 }
 function sfxMenu() { playTone(440, 'sine', 0.08, 0.04); }
 function sfxStealth() { playTone(200, 'sine', 0.4, 0.03); playTone(150, 'sine', 0.3, 0.02, 0.2); }
+
+// ═══════════════════════════════════════════════
+// MISSION AUDIO — reproducción en bucle por avión
+// ═══════════════════════════════════════════════
+let bgAudioEl = null;
+const MISSION_AUDIO = {
+  f37:        'static/audio/ifyoufeelmylove.mp3',
+  bombardino: 'static/audio/Bombardino_Crocodilo.mp3',
+};
+function startMissionAudio(planeId) {
+  stopMissionAudio();
+  const src = MISSION_AUDIO[planeId] || '';
+  if (!src) return;
+  bgAudioEl = new Audio(src);
+  bgAudioEl.loop = true;
+  bgAudioEl.volume = 0.7;
+  bgAudioEl.play().catch(() => {});
+}
+function stopMissionAudio() {
+  if (bgAudioEl) { bgAudioEl.pause(); bgAudioEl.src = ''; bgAudioEl = null; }
+}
+
+// ═══════════════════════════════════════════════
+// STRINGS — soporte bilingüe (es / zh para F-37)
+// ═══════════════════════════════════════════════
+const STRINGS = {
+  es: {
+    startBtn: 'INICIAR MISIÓN', retryBtn: 'REINTENTAR', retryChallenge: 'REINTENTAR RETO',
+    backMenu: '← MENÚ PRINCIPAL', abandonChallenge: '← ABANDONAR RETO',
+    hangar: '✈ HANGAR',
+    statPuntos: 'puntos', statNivel: 'nivel', statBajas: 'bajas',
+    hpLabel: 'INTEGRIDAD', abilidadLabel: 'HABILIDAD',
+    puntuacion: 'PUNTUACIÓN', record: 'RÉCORD: ',
+    tip: 'TOCA/ARRASTRA · DISPARO: CLICK · HABILIDAD: SHIFT / Q',
+    misionIniciada: '— MISIÓN INICIADA —',
+    abilMisil: 'MISIL GUIADO', abilDash: 'DASH EVASIVO', abilStealth: 'STEALTH',
+    abilStealthActive: 'STEALTH ACTIVO', abilTurbo: 'TURBO ACTIVO',
+    abilRafagaTotal: 'RÁFAGA TOTAL', abilHeal: '+15 HP REPARADO',
+    abilTodo: 'TODO A LA VEZ', abilRafaga360: 'RÁFAGA 360°', abilStealth2: 'MODO STEALTH',
+    nivel: 'NIVEL',
+  },
+  zh: {
+    startBtn: '开始任务', retryBtn: '重新开始', retryChallenge: '重试挑战',
+    backMenu: '← 主菜单', abandonChallenge: '← 放弃挑战',
+    hangar: '✈ 机库',
+    statPuntos: '积分', statNivel: '等级', statBajas: '击落',
+    hpLabel: '完整性', abilidadLabel: '技能',
+    puntuacion: '得分', record: '记录: ',
+    tip: '触摸/拖动 · 射击: 点击 · 技能: SHIFT / Q',
+    misionIniciada: '— 任务开始 —',
+    abilMisil: '导弹制导', abilDash: '回避冲刺', abilStealth: '隐身',
+    abilStealthActive: '隐身激活', abilTurbo: '加速激活',
+    abilRafagaTotal: '全方位射击', abilHeal: '+15 HP 修复',
+    abilTodo: '全部同时', abilRafaga360: '360°射击', abilStealth2: '隐身模式',
+    nivel: '等级',
+  },
+};
+function t(key) {
+  const lang = currentPlaneId === 'f37' ? 'zh' : 'es';
+  return (STRINGS[lang] && STRINGS[lang][key]) || STRINGS.es[key] || key;
+}
+function applyLang() {
+  const L = currentPlaneId === 'f37' ? STRINGS.zh : STRINGS.es;
+  document.getElementById('btnHangar').textContent = L.hangar;
+  document.getElementById('hpLabel').textContent = L.hpLabel;
+  const labels = document.querySelectorAll('#ui .stat-label');
+  if (labels[0]) labels[0].textContent = L.statPuntos;
+  if (labels[1]) labels[1].textContent = L.statNivel;
+  if (labels[2]) labels[2].textContent = L.statBajas;
+  const lbl = document.querySelector('#scoreBox .lbl');
+  if (lbl) lbl.textContent = L.puntuacion;
+  document.getElementById('tipText').textContent = L.tip;
+}
 
 // ═══════════════════════════════════════════════
 // CANVAS & RESIZE
@@ -611,7 +717,7 @@ function drawPlane(x, y, angle, color, scale, alpha, planeId) {
   const dk = darken(c1);
   const pid = planeId || 'f18';
 
-  if (pid === 'a400m') {
+  if (pid === 'a400m' || pid === 'bombardino') {
     // Wide transport silhouette
     ctx.fillStyle = c1;
     ctx.beginPath(); ctx.ellipse(0,0,9,24,0,0,Math.PI*2); ctx.fill();
@@ -655,7 +761,7 @@ function drawPlane(x, y, angle, color, scale, alpha, planeId) {
     ctx.beginPath(); ctx.moveTo(4,-8); ctx.lineTo(14,-4); ctx.lineTo(12,0); ctx.lineTo(4,-2); ctx.closePath(); ctx.fill();
     ctx.fillStyle='#fff4aa'; ctx.shadowColor='#ffcc00'; ctx.shadowBlur=8;
     ctx.beginPath(); ctx.ellipse(0,20,3,5,0,0,Math.PI*2); ctx.fill();
-  } else if (pid === 'f22') {
+  } else if (pid === 'f22' || pid === 'f37') {
     // Stealth diamond
     ctx.fillStyle = c1;
     ctx.beginPath(); ctx.moveTo(0,-24); ctx.lineTo(6,4); ctx.lineTo(0,10); ctx.lineTo(-6,4); ctx.closePath(); ctx.fill();
@@ -766,7 +872,7 @@ function getEnemyType() {
 function spawnEnemy() {
   const t=getEnemyType();
   const pd=currentPlaneDef();
-  const stl = pd.id==='f22' && stealthActive;
+  const stl = (pd.id==='f22' || pd.id==='f37' || pd.id==='f-golden') && stealthActive;
   enemies.push({
     x:rand(40,W-40), y:-30,
     type:t, hp:t.hp+Math.floor(level*0.4), maxHp:t.hp+Math.floor(level*0.4),
@@ -810,10 +916,15 @@ function shootBullet() {
       bullets.push({ x:player.x-22, y:player.y+4, vx:-0.5, vy:-10.8, friendly:true, color:col });
     }
   } else if (pat === 'spread') {
-    // AvioJeta – wide fan
     [-0.4,-0.15,0,0.15,0.4].forEach(vx => {
       bullets.push({ x:player.x, y:player.y-20, vx:vx*12, vy:-12, friendly:true, color:col });
     });
+    // F-GOLDEN también dispara ráfagas laterales como el A400M
+    if (pd.id==='f-golden' && shotCount%3===0) {
+      [-1,-0.5,0.5,1].forEach(vx => {
+        bullets.push({ x:player.x, y:player.y, vx:vx*8, vy:-6, friendly:true, color:col });
+      });
+    }
   } else if (pat === 'heavy') {
     // A400M – slow big shots
     bullets.push({ x:player.x, y:player.y-24, vx:0, vy:-10, friendly:true, color:col, long:true });
@@ -840,26 +951,41 @@ function useAbility() {
   if (pd.id==='f18') {
     if (abilityCharge < pd.stats.abilityMax) return;
     launchGuidedMissile(); abilityCharge=0; lastAbilityUse=now; sfxMissile();
-    showAbilityAnnounce('MISIL GUIADO');
+    showAbilityAnnounce(t('abilMisil'));
   } else if (pd.id==='eurofighter') {
     if (abilityCharge < pd.stats.abilityMax) return;
     doDash(); abilityCharge=0; lastAbilityUse=now;
-    showAbilityAnnounce('DASH EVASIVO');
-  } else if (pd.id==='f22') {
-    // passive, no manual trigger needed
+    showAbilityAnnounce(t('abilDash'));
+  } else if (pd.id==='f22' || pd.id==='f37') {
+    // passive stealth, no manual trigger needed
   } else if (pd.id==='aviojeta') {
     if (abilityCharge < pd.stats.abilityMax) return;
     player.turbo=120; abilityCharge=0; lastAbilityUse=now; sfxDash();
-    showAbilityAnnounce('TURBO ACTIVO');
+    showAbilityAnnounce(t('abilTurbo'));
   } else if (pd.id==='a400m') {
     if (abilityCharge < pd.stats.abilityMax) return;
-    doFullBurst(); abilityCharge=0; lastAbilityUse=now;
-    showAbilityAnnounce('RÁFAGA TOTAL');
+    doFullBurst(pd.color); abilityCharge=0; lastAbilityUse=now;
+    showAbilityAnnounce(t('abilRafagaTotal'));
   } else if (pd.id==='c295') {
     if (abilityCharge < pd.stats.abilityMax) return;
     hp = Math.min(hp+15, currentPlaneDef().stats.maxHp);
     abilityCharge=0; lastAbilityUse=now; sfxHeal();
-    showAbilityAnnounce('+15 HP REPARADO');
+    showAbilityAnnounce(t('abilHeal'));
+    updateUI();
+  } else if (pd.id==='bombardino') {
+    if (abilityCharge < pd.stats.abilityMax) return;
+    doFullBurst(pd.color); abilityCharge=0; lastAbilityUse=now;
+    showAbilityAnnounce(t('abilRafaga360'));
+  } else if (pd.id==='f-golden') {
+    if (abilityCharge < pd.stats.abilityMax) return;
+    launchGuidedMissile();
+    doDash();
+    player.turbo=120;
+    doFullBurst(pd.color);
+    hp = Math.min(hp+15, pd.stats.maxHp);
+    abilityCharge=0; lastAbilityUse=now;
+    sfxExplosion(); sfxMissile(); sfxHeal();
+    showAbilityAnnounce(t('abilTodo'));
     updateUI();
   }
   updateAbilityBar();
@@ -886,8 +1012,8 @@ function doDash() {
   sfxDash();
 }
 
-function doFullBurst() {
-  const col='#88cc66';
+function doFullBurst(col) {
+  col = col || '#88cc66';
   for(let a=0;a<360;a+=20) {
     const r=a*Math.PI/180;
     bullets.push({ x:player.x, y:player.y, vx:Math.sin(r)*9, vy:-Math.abs(Math.cos(r))*9, friendly:true, color:col });
@@ -904,9 +1030,9 @@ function showAbilityAnnounce(txt) {
 
 function updateAbilityBar() {
   const pd=currentPlaneDef();
-  if(pd.id==='f22') {
+  if(pd.id==='f22' || pd.id==='f37') {
     document.getElementById('abilityFill').style.width=stealthActive?'100%':'0%';
-    document.getElementById('abilityLabel').textContent=stealthActive?'STEALTH ACTIVO':'STEALTH';
+    document.getElementById('abilityLabel').textContent=stealthActive?t('abilStealthActive'):t('abilStealth');
     return;
   }
   const pct=Math.min(100,(abilityCharge/pd.stats.abilityMax)*100);
@@ -925,7 +1051,7 @@ function initGame() {
   abilityCharge=0; lastAbilityUse=0; shotCount=0;
   player={ x:W/2, y:H*0.75, w:36, h:44, invincible:0, trail:[], turbo:0, dashVx:0, dashVy:0, lastMoveX:0, lastMoveY:-1 };
   bullets=[]; enemies=[]; enemyBullets=[]; particles=[]; drones=[]; missiles=[];
-  if(pd.id==='c295') {
+  if(pd.id==='c295' || pd.id==='f-golden') {
     drones=[{angle:0},{angle:Math.PI}];
   }
   initStars();
@@ -1092,13 +1218,12 @@ function gameLoop() {
   for(let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
   for(let y=-go;y<H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
 
-  // Stealth detection (F22)
-  if(pd.id==='f22') {
+  // Stealth detection (F22, F37, F-GOLDEN)
+  if(pd.id==='f22' || pd.id==='f37' || pd.id==='f-golden') {
     const notShooting = Date.now()-lastFireTime > 2000;
     if(notShooting && !stealthActive) {
       stealthActive=true; sfxStealth();
-      showAbilityAnnounce('MODO STEALTH');
-      // Reduce all enemy shoot rates
+      showAbilityAnnounce(t('abilStealth2'));
       for(const e of enemies) e.shootRate*=0.4;
     }
     if(!notShooting && stealthActive) {
@@ -1122,7 +1247,7 @@ function gameLoop() {
 
   // Level up
   const nl=1+Math.floor(score/500);
-  if(nl>level){ level=nl; announceWave('— NIVEL '+level+' —'); sfxLevelUp(); }
+  if(nl>level){ level=nl; announceWave('— '+t('nivel')+' '+level+' —'); sfxLevelUp(); }
 
   // Guided missiles update
   for(let i=missiles.length-1;i>=0;i--){
@@ -1150,7 +1275,7 @@ function gameLoop() {
   }
 
   // Drones (C295)
-  if(pd.id==='c295' && drones.length>0){
+  if((pd.id==='c295' || pd.id==='f-golden') && drones.length>0){
     droneAngle+=0.04;
     for(let di=0;di<drones.length;di++){
       const dr=drones[di];
@@ -1188,7 +1313,7 @@ function gameLoop() {
     e.x+=e.vx+Math.sin(frame*0.04+e.phase)*0.8;
     e.x=clamp(e.x,20,W-20);
 
-    const stl=pd.id==='f22'&&stealthActive;
+    const stl=(pd.id==='f22'||pd.id==='f37'||pd.id==='f-golden')&&stealthActive;
     if(Math.random()<e.shootRate*(stl?0.4:1)){
       const targetX=stl?player.x+rand(-100,100):player.x;
       const targetY=stl?player.y+rand(-80,80):player.y;
@@ -1205,7 +1330,7 @@ function gameLoop() {
       ctx.fillStyle=`hsl(${(e.hp/e.maxHp)*120},80%,50%)`;
       ctx.fillRect(e.x-bw/2,e.y-38*e.scale,bw*(e.hp/e.maxHp),4);
     }
-    drawPlane(e.x,e.y,Math.PI,e.color,e.scale,1,'f18');
+    drawPlane(e.x,e.y,Math.PI,e.color,e.scale,1,null);
     if(e.y>H+40){enemies.splice(i,1);continue;}
 
     if(player.invincible<=0&&dist(e,player)<28*e.scale){
@@ -1230,7 +1355,7 @@ function gameLoop() {
         if(e.hp<=0){
           spawnParticle(e.x,e.y,e.color,18); sfxExplosion();
           let sc=e.score*(1+level*0.05);
-          if(pd.id==='aviojeta') sc*=1.2;
+          if(pd.id==='aviojeta' || pd.id==='f-golden') sc*=1.2;
           score+=Math.floor(sc); kills++;
           enemies.splice(j,1); updateUI();
         }
@@ -1336,7 +1461,14 @@ function doStartGame() {
   document.getElementById('moveZone').style.display='block';
   document.getElementById('abilityBar').style.display='block';
   initGame();
-  announceWave('— MISIÓN INICIADA —');
+  applyLang();
+  startMissionAudio(currentPlaneId);
+  if (currentPlaneId === 'fcas') {
+    endGame();
+    document.getElementById('fcasMsg').style.display='block';
+    return;
+  }
+  announceWave(t('misionIniciada'));
   gameLoop();
 }
 
@@ -1347,21 +1479,23 @@ function endGame() {
   document.getElementById('moveZone').style.display='none';
   document.getElementById('abilityBar').style.display='none';
   clearInterval(autoFireInterval); isFiring=false;
+  stopMissionAudio();
   if(score>best){best=score;localStorage.setItem('skyBest',best);}
   document.getElementById('finalScore').textContent=score;
-  document.getElementById('bestScore').textContent='RÉCORD: '+best;
+  document.getElementById('bestScore').textContent=t('record')+best;
+  document.getElementById('fcasMsg').style.display='none';
   document.getElementById('scoreBox').style.display='flex';
   document.getElementById('tipText').style.display='none';
   document.getElementById('overlay').classList.remove('hidden');
   if(unlockMode && unlockTarget) {
-    const pd=PLANES.find(p=>p.id===unlockTarget);
-    document.getElementById('btnStart').textContent='REINTENTAR RETO';
-    document.getElementById('btnBackMenu').textContent='← ABANDONAR RETO';
+    document.getElementById('btnStart').textContent=t('retryChallenge');
+    document.getElementById('btnBackMenu').textContent=t('abandonChallenge');
   } else {
-    document.getElementById('btnStart').textContent='REINTENTAR';
-    document.getElementById('btnBackMenu').textContent='← MENÚ PRINCIPAL';
+    document.getElementById('btnStart').textContent=t('retryBtn');
+    document.getElementById('btnBackMenu').textContent=t('backMenu');
   }
   document.getElementById('btnBackMenu').style.display='';
+  applyLang();
   state='menu';
 }
 
@@ -1400,7 +1534,8 @@ function openHangar() {
   const list=document.getElementById('hangarList');
   const sel=getSelectedPlane();
   list.innerHTML='';
-  PLANES.forEach(pd=>{
+  const sortedPlanes=[...PLANES].sort((a,b)=>(a.secret?1:0)-(b.secret?1:0));
+  sortedPlanes.forEach(pd=>{
     const isUnlocked=unlocked.includes(pd.id);
     const isSelected=pd.id===sel;
     const isSecret=pd.secret===true;
@@ -1438,7 +1573,7 @@ function openHangar() {
     if(isUnlocked){
       info.innerHTML=`<div class="plane-name">${pd.name}</div><div class="plane-role">${pd.role}</div><div class="plane-desc">${pd.desc}</div>`;
     } else if(isSecret) {
-      info.innerHTML=`<div class="plane-name" style="color:rgba(100,200,255,0.3)">???</div><div class="plane-role" style="color:rgba(100,200,255,0.2)">???</div><div class="plane-desc" style="color:rgba(100,200,255,0.2)">Avión secreto. Descúbrelo...</div>`;
+      info.innerHTML=`<div class="plane-name" style="color:rgba(100,200,255,0.3)">???</div><div class="plane-role" style="color:rgba(100,200,255,0.2)">???</div><div class="plane-desc" style="color:rgba(100,200,255,0.2)">???</div>`;
     } else {
       // Public: show real name and role but grayed, and ability hint
       info.innerHTML=`<div class="plane-name" style="color:rgba(100,200,255,0.5)">${pd.name}</div><div class="plane-role" style="color:rgba(100,200,255,0.3)">${pd.role}</div><div class="plane-desc" style="color:rgba(200,230,255,0.3)">${pd.desc}</div>`;
@@ -1447,14 +1582,14 @@ function openHangar() {
     card.appendChild(wrap); card.appendChild(info); card.appendChild(tag);
     if(isUnlocked && !isSelected){
       card.style.cursor='pointer';
-      card.addEventListener('click',()=>{ sfxMenu(); setSelectedPlane(pd.id); currentPlaneId=pd.id; openHangar(); });
+      card.addEventListener('click',()=>{ sfxMenu(); setSelectedPlane(pd.id); currentPlaneId=pd.id; applyLang(); openHangar(); });
     }
     list.appendChild(card);
   });
   document.getElementById('hangarScreen').classList.add('show');
 }
 
-document.getElementById('hangarBack').addEventListener('click',()=>{ sfxMenu(); document.getElementById('hangarScreen').classList.remove('show'); });
+document.getElementById('hangarBack').addEventListener('click',()=>{ sfxMenu(); document.getElementById('hangarScreen').classList.remove('show'); applyLang(); });
 document.getElementById('btnHangar').addEventListener('click',()=>{ sfxMenu(); openHangar(); });
 
 // ═══════════════════════════════════════════════
@@ -1485,7 +1620,7 @@ function drawPlaneOnCtx(c, x, y, angle, color, scale, alpha, planeId) {
   c.globalAlpha=alpha||1; c.translate(x,y); c.rotate(angle||0); c.scale(scale||1,scale||1);
   const c1=color||'#64c8ff', c2=lighten(c1), dk=darken(c1);
   const pid=planeId||'f18';
-  if(pid==='a400m'){
+  if(pid==='a400m'||pid==='bombardino'){
     c.fillStyle=c1; c.beginPath(); c.ellipse(0,0,9,24,0,0,Math.PI*2); c.fill();
     c.fillStyle=c2; c.beginPath(); c.moveTo(0,-24); c.lineTo(-5,-10); c.lineTo(5,-10); c.closePath(); c.fill();
     c.fillStyle=dk;
@@ -1508,7 +1643,7 @@ function drawPlaneOnCtx(c, x, y, angle, color, scale, alpha, planeId) {
     c.beginPath(); c.moveTo(-5,8); c.lineTo(-24,22); c.lineTo(0,14); c.lineTo(24,22); c.lineTo(5,8); c.closePath(); c.fill();
     c.beginPath(); c.moveTo(-4,-8); c.lineTo(-14,-4); c.lineTo(-12,0); c.lineTo(-4,-2); c.closePath(); c.fill();
     c.beginPath(); c.moveTo(4,-8); c.lineTo(14,-4); c.lineTo(12,0); c.lineTo(4,-2); c.closePath(); c.fill();
-  } else if(pid==='f22'){
+  } else if(pid==='f22'||pid==='f37'){
     c.fillStyle=c1;
     c.beginPath(); c.moveTo(0,-24); c.lineTo(6,4); c.lineTo(0,10); c.lineTo(-6,4); c.closePath(); c.fill();
     c.fillStyle=dk;
@@ -1654,10 +1789,11 @@ document.getElementById('btnBackMenu').addEventListener('click',()=>{
   sfxMenu();
   unlockMode=false; unlockTarget=null;
   document.getElementById('scoreBox').style.display='none';
-  document.getElementById('btnStart').textContent='INICIAR MISIÓN';
   document.getElementById('btnBackMenu').style.display='none';
-  document.getElementById('tipText').style.display='';
   currentPlaneId=getSelectedPlane();
+  document.getElementById('btnStart').textContent=t('startBtn');
+  document.getElementById('tipText').style.display='';
+  applyLang();
   state='menu';
   drawMenuCanvas();
 });
@@ -1672,12 +1808,12 @@ document.getElementById('btnStart2').addEventListener('click',()=>{
 document.getElementById('btnUnlockMenu').addEventListener('click',()=>{
   sfxMenu();
   unlockMode=false; unlockTarget=null;
-  // Reset to a safe selected plane
   currentPlaneId=getSelectedPlane();
   document.getElementById('unlockScreen').classList.remove('show');
   document.getElementById('scoreBox').style.display='none';
-  document.getElementById('btnStart').textContent='INICIAR MISIÓN';
+  document.getElementById('btnStart').textContent=t('startBtn');
   document.getElementById('tipText').style.display='';
+  applyLang();
   document.getElementById('overlay').classList.remove('hidden');
   state='menu';
   drawMenuCanvas();
@@ -1714,6 +1850,7 @@ function drawMenuCanvas() {
   // Preload all plane images first, then start
   preloadPlaneImages(()=>{
     initStars();
+    applyLang();
     if(up){
       const pd=PLANES.find(p=>p.id===up);
       if(pd){
