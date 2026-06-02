@@ -343,9 +343,14 @@ canvas { display:block; width:100%; height:100%; image-rendering:pixelated; }
 
 <script>
 // ═══════════════════════════════════════════════
-// DEBUG MODE — toggle here
+// DEBUG MODE — false por defecto
+// Activa/desactiva con ?debug=true o ?debug=false (se guarda en localStorage)
 // ═══════════════════════════════════════════════
-const DEBUG = true;
+(function(){
+  const p = new URLSearchParams(window.location.search);
+  if (p.has('debug')) localStorage.setItem('skyDebug', p.get('debug')==='true'?'1':'0');
+})();
+const DEBUG = localStorage.getItem('skyDebug') === '1';
 
 // ═══════════════════════════════════════════════
 // PLANE DEFINITIONS
@@ -506,6 +511,14 @@ function unlockPlane(id) {
 function getSelectedPlane() { return localStorage.getItem('skySelectedPlane') || 'f18'; }
 function setSelectedPlane(id) { localStorage.setItem('skySelectedPlane', id); }
 
+function updateStartButton() {
+  const btn = document.getElementById('btnStart');
+  const canPlay = unlockMode || getUnlocked().length > 0;
+  btn.disabled = !canPlay;
+  btn.style.opacity = canPlay ? '' : '0.3';
+  btn.style.cursor  = canPlay ? '' : 'not-allowed';
+}
+
 // ═══════════════════════════════════════════════
 // AUDIO — Web Audio API
 // ═══════════════════════════════════════════════
@@ -560,24 +573,49 @@ function sfxMenu() { playTone(440, 'sine', 0.08, 0.04); }
 function sfxStealth() { playTone(200, 'sine', 0.4, 0.03); playTone(150, 'sine', 0.3, 0.02, 0.2); }
 
 // ═══════════════════════════════════════════════
-// MISSION AUDIO — reproducción en bucle por avión
+// MISSION AUDIO — AudioContext BufferSource (compatible Android)
 // ═══════════════════════════════════════════════
-let bgAudioEl = null;
 const MISSION_AUDIO = {
   f37:        'static/audio/ifyoufeelmylove.mp3',
   bombardino: 'static/audio/Bombardino_Crocodilo.mp3',
 };
+let bgSource = null, bgGain = null;
+const _audioBufCache = {};
+
+async function _loadAudioBuf(src) {
+  if (_audioBufCache[src]) return _audioBufCache[src];
+  try {
+    const resp = await fetch(src);
+    const ab   = await resp.arrayBuffer();
+    const buf  = await getAudioCtx().decodeAudioData(ab);
+    _audioBufCache[src] = buf;
+    return buf;
+  } catch(e) { return null; }
+}
+
 function startMissionAudio(planeId) {
   stopMissionAudio();
   const src = MISSION_AUDIO[planeId] || '';
   if (!src) return;
-  bgAudioEl = new Audio(src);
-  bgAudioEl.loop = true;
-  bgAudioEl.volume = 0.7;
-  bgAudioEl.play().catch(() => {});
+  const ac = getAudioCtx();
+  ac.resume().then(async () => {
+    const buf = await _loadAudioBuf(src);
+    if (!buf) return;
+    stopMissionAudio();           // por si llamaron stop mientras cargaba
+    bgGain = ac.createGain();
+    bgGain.gain.value = 0.7;
+    bgGain.connect(ac.destination);
+    bgSource = ac.createBufferSource();
+    bgSource.buffer = buf;
+    bgSource.loop = true;
+    bgSource.connect(bgGain);
+    bgSource.start(0);
+  });
 }
+
 function stopMissionAudio() {
-  if (bgAudioEl) { bgAudioEl.pause(); bgAudioEl.src = ''; bgAudioEl = null; }
+  if (bgSource) { try { bgSource.stop(0); } catch(e) {} bgSource = null; }
+  bgGain = null;
 }
 
 // ═══════════════════════════════════════════════
@@ -648,7 +686,7 @@ window.addEventListener('resize', resize);
 // ═══════════════════════════════════════════════
 let state = 'menu'; // menu | playing | gameover
 let score, level, kills, hp, frame;
-let player, bullets, enemies, enemyBullets, particles, stars, drones, missiles;
+let player, bullets, enemies, enemyBullets, particles, stars, drones, missiles, hpOrbs;
 let spawnTimer, lastShot;
 let autoFireInterval, isFiring = false;
 let best = parseInt(localStorage.getItem('skyBest') || '0');
@@ -890,6 +928,12 @@ function spawnParticle(x,y,color,count) {
   }
 }
 
+function spawnHpOrb(x, y) {
+  if (level < 3) return;
+  if (Math.random() > 0.12) return;
+  hpOrbs.push({ x, y, vy: 1.0 + Math.random() * 0.6 });
+}
+
 // ═══════════════════════════════════════════════
 // SHOOTING
 // ═══════════════════════════════════════════════
@@ -1050,7 +1094,7 @@ function initGame() {
   dashActive=0; dashCooldown=0; droneAngle=0;
   abilityCharge=0; lastAbilityUse=0; shotCount=0;
   player={ x:W/2, y:H*0.75, w:36, h:44, invincible:0, trail:[], turbo:0, dashVx:0, dashVy:0, lastMoveX:0, lastMoveY:-1 };
-  bullets=[]; enemies=[]; enemyBullets=[]; particles=[]; drones=[]; missiles=[];
+  bullets=[]; enemies=[]; enemyBullets=[]; particles=[]; drones=[]; missiles=[]; hpOrbs=[];
   if(pd.id==='c295' || pd.id==='f-golden') {
     drones=[{angle:0},{angle:Math.PI}];
   }
@@ -1265,6 +1309,7 @@ function gameLoop() {
       if(m.target.hp<=0){
         spawnParticle(m.target.x,m.target.y,m.target.color,20);
         sfxExplosion();
+        spawnHpOrb(m.target.x, m.target.y);
         score+=m.target.score*(pd.id==='aviojeta'?1.2:1);
         kills++;
         const idx=enemies.indexOf(m.target); if(idx>=0) enemies.splice(idx,1);
@@ -1354,6 +1399,7 @@ function gameLoop() {
         bullets.splice(i,1); hit=true;
         if(e.hp<=0){
           spawnParticle(e.x,e.y,e.color,18); sfxExplosion();
+          spawnHpOrb(e.x, e.y);
           let sc=e.score*(1+level*0.05);
           if(pd.id==='aviojeta' || pd.id==='f-golden') sc*=1.2;
           score+=Math.floor(sc); kills++;
@@ -1388,6 +1434,39 @@ function gameLoop() {
     ctx.beginPath(); ctx.arc(p.x,p.y,p.r*(p.life/p.maxLife),0,Math.PI*2); ctx.fill();
   }
   ctx.globalAlpha=1;
+
+  // HP Orbs
+  for(let i=hpOrbs.length-1;i>=0;i--){
+    const orb=hpOrbs[i];
+    orb.y+=orb.vy;
+    // Draw
+    const pulse=0.85+0.15*Math.sin(frame*0.15);
+    const r=10*pulse;
+    ctx.save();
+    ctx.shadowColor='#ff6699'; ctx.shadowBlur=14;
+    ctx.fillStyle='#cc2255';
+    ctx.beginPath(); ctx.arc(orb.x,orb.y,r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ff88bb';
+    ctx.beginPath(); ctx.arc(orb.x,orb.y,r*0.55,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#fff';
+    ctx.font='bold 9px monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('♥',orb.x,orb.y);
+    ctx.restore();
+    // Collect
+    if(dist(orb,player)<r+22){
+      const pd2=currentPlaneDef();
+      hp=Math.min(hp+20,pd2.stats.maxHp);
+      sfxHeal();
+      showAbilityAnnounce('+20 HP');
+      spawnParticle(orb.x,orb.y,'#ff6699',10);
+      updateUI();
+      hpOrbs.splice(i,1);
+      continue;
+    }
+    if(orb.y>H+20){ hpOrbs.splice(i,1); continue; }
+  }
 
   // Player draw
   const showPlayer = player.invincible<=0 || (Math.floor(player.invincible/6)%2===0);
@@ -1496,6 +1575,7 @@ function endGame() {
   }
   document.getElementById('btnBackMenu').style.display='';
   applyLang();
+  updateStartButton();
   state='menu';
 }
 
@@ -1746,13 +1826,16 @@ function buildDebugPanel() {
       sfxMenu();
       const u=getUnlocked();
       if(u.includes(pd.id)){
-        if(pd.id==='f18') return; // can't lock starter
         const idx=u.indexOf(pd.id); u.splice(idx,1); setUnlocked(u);
-        if(getSelectedPlane()===pd.id) setSelectedPlane('f18');
+        if(getSelectedPlane()===pd.id){
+          const remaining=getUnlocked();
+          setSelectedPlane(remaining.length>0?remaining[0]:'');
+        }
       } else {
         unlockPlane(pd.id);
       }
       buildDebugPanel();
+      updateStartButton();
     });
     row.appendChild(lbl); row.appendChild(btn); rows.appendChild(row);
   });
@@ -1794,6 +1877,7 @@ document.getElementById('btnBackMenu').addEventListener('click',()=>{
   document.getElementById('btnStart').textContent=t('startBtn');
   document.getElementById('tipText').style.display='';
   applyLang();
+  updateStartButton();
   state='menu';
   drawMenuCanvas();
 });
@@ -1814,6 +1898,7 @@ document.getElementById('btnUnlockMenu').addEventListener('click',()=>{
   document.getElementById('btnStart').textContent=t('startBtn');
   document.getElementById('tipText').style.display='';
   applyLang();
+  updateStartButton();
   document.getElementById('overlay').classList.remove('hidden');
   state='menu';
   drawMenuCanvas();
@@ -1851,6 +1936,7 @@ function drawMenuCanvas() {
   preloadPlaneImages(()=>{
     initStars();
     applyLang();
+    updateStartButton();
     if(up){
       const pd=PLANES.find(p=>p.id===up);
       if(pd){
