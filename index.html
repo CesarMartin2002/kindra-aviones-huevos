@@ -393,8 +393,8 @@ const PLANES = [
     stats: { maxHp: 90, speed: 5.0, fireRate: 220, bulletPattern: 'standard', abilityMax: 1 }
   },
   {
-    id: 'aviojeta',
-    name: 'AVIOJETA 101 CASA',
+    id: 'aviojet',
+    name: 'aviojet 101 CASA',
     role: 'Entrenador Ágil',
     secret: false,
     color: '#ffcc44',
@@ -453,8 +453,8 @@ const PLANES = [
     stats: { maxHp: 100, speed: 4.5, fireRate: 200, bulletPattern: 'standard', abilityMax: 300 }
   },
   {
-    id: 'f-golden',
-    name: 'F-GOLDEN',
+    id: 'f-22golden',
+    name: 'F-22 GOLDEN',
     role: 'Avión Definitivo',
     secret: true,
     color: '#ffd700',
@@ -502,7 +502,7 @@ function getPlaneImage(id) {
 // LOCALSTORAGE
 // ═══════════════════════════════════════════════
 function getUnlocked() {
-  try { return JSON.parse(localStorage.getItem('skyUnlocked') || '["f18"]'); } catch(e) { return ['f18']; }
+  try { return JSON.parse(localStorage.getItem('skyUnlocked') || '[]'); } catch(e) { return []; }
 }
 function setUnlocked(arr) { localStorage.setItem('skyUnlocked', JSON.stringify(arr)); }
 function unlockPlane(id) {
@@ -810,7 +810,7 @@ function drawPlane(x, y, angle, color, scale, alpha, planeId) {
     ctx.beginPath(); ctx.moveTo(-3,14); ctx.lineTo(-8,24); ctx.lineTo(0,20); ctx.lineTo(8,24); ctx.lineTo(3,14); ctx.closePath(); ctx.fill();
     ctx.fillStyle='#aac8ff'; ctx.shadowColor='#8888ff'; ctx.shadowBlur=10;
     ctx.beginPath(); ctx.ellipse(0,18,4,6,0,0,Math.PI*2); ctx.fill();
-  } else if (pid === 'aviojeta') {
+  } else if (pid === 'aviojet') {
     // Trainer – compact & round
     ctx.fillStyle = c1;
     ctx.beginPath(); ctx.ellipse(0,0,6,18,0,0,Math.PI*2); ctx.fill();
@@ -910,7 +910,7 @@ function getEnemyType() {
 function spawnEnemy() {
   const t=getEnemyType();
   const pd=currentPlaneDef();
-  const stl = (pd.id==='f22' || pd.id==='f37' || pd.id==='f-golden') && stealthActive;
+  const stl = (pd.id==='f22' || pd.id==='f37' || pd.id==='f-22golden') && stealthActive;
   enemies.push({
     x:rand(40,W-40), y:-30,
     type:t, hp:t.hp+Math.floor(level*0.4), maxHp:t.hp+Math.floor(level*0.4),
@@ -963,8 +963,8 @@ function shootBullet() {
     [-0.4,-0.15,0,0.15,0.4].forEach(vx => {
       bullets.push({ x:player.x, y:player.y-20, vx:vx*12, vy:-12, friendly:true, color:col });
     });
-    // F-GOLDEN también dispara ráfagas laterales como el A400M
-    if (pd.id==='f-golden' && shotCount%3===0) {
+    // F-22GOLDEN también dispara ráfagas laterales como el A400M
+    if (pd.id==='f-22golden' && shotCount%3===0) {
       [-1,-0.5,0.5,1].forEach(vx => {
         bullets.push({ x:player.x, y:player.y, vx:vx*8, vy:-6, friendly:true, color:col });
       });
@@ -980,7 +980,7 @@ function shootBullet() {
     }
   }
   // Ability charge
-  abilityCharge = Math.min(abilityCharge+1, pd.stats.abilityMax);
+  abilityCharge = Math.min(abilityCharge+3, pd.stats.abilityMax);
   updateAbilityBar();
 }
 
@@ -1002,7 +1002,7 @@ function useAbility() {
     showAbilityAnnounce(t('abilDash'));
   } else if (pd.id==='f22' || pd.id==='f37') {
     // passive stealth, no manual trigger needed
-  } else if (pd.id==='aviojeta') {
+  } else if (pd.id==='aviojet') {
     if (abilityCharge < pd.stats.abilityMax) return;
     player.turbo=120; abilityCharge=0; lastAbilityUse=now; sfxDash();
     showAbilityAnnounce(t('abilTurbo'));
@@ -1020,7 +1020,7 @@ function useAbility() {
     if (abilityCharge < pd.stats.abilityMax) return;
     doFullBurst(pd.color); abilityCharge=0; lastAbilityUse=now;
     showAbilityAnnounce(t('abilRafaga360'));
-  } else if (pd.id==='f-golden') {
+  } else if (pd.id==='f-22golden') {
     if (abilityCharge < pd.stats.abilityMax) return;
     launchGuidedMissile();
     doDash();
@@ -1095,7 +1095,7 @@ function initGame() {
   abilityCharge=0; lastAbilityUse=0; shotCount=0;
   player={ x:W/2, y:H*0.75, w:36, h:44, invincible:0, trail:[], turbo:0, dashVx:0, dashVy:0, lastMoveX:0, lastMoveY:-1 };
   bullets=[]; enemies=[]; enemyBullets=[]; particles=[]; drones=[]; missiles=[]; hpOrbs=[];
-  if(pd.id==='c295' || pd.id==='f-golden') {
+  if(pd.id==='c295' || pd.id==='f-22golden') {
     drones=[{angle:0},{angle:Math.PI}];
   }
   initStars();
@@ -1262,8 +1262,8 @@ function gameLoop() {
   for(let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
   for(let y=-go;y<H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
 
-  // Stealth detection (F22, F37, F-GOLDEN)
-  if(pd.id==='f22' || pd.id==='f37' || pd.id==='f-golden') {
+  // Stealth detection (F22, F37, F-22GOLDEN)
+  if(pd.id==='f22' || pd.id==='f37' || pd.id==='f-22golden') {
     const notShooting = Date.now()-lastFireTime > 2000;
     if(notShooting && !stealthActive) {
       stealthActive=true; sfxStealth();
@@ -1310,7 +1310,7 @@ function gameLoop() {
         spawnParticle(m.target.x,m.target.y,m.target.color,20);
         sfxExplosion();
         spawnHpOrb(m.target.x, m.target.y);
-        score+=m.target.score*(pd.id==='aviojeta'?1.2:1);
+        score+=m.target.score*(pd.id==='aviojet'?1.2:1);
         kills++;
         const idx=enemies.indexOf(m.target); if(idx>=0) enemies.splice(idx,1);
         updateUI();
@@ -1320,7 +1320,7 @@ function gameLoop() {
   }
 
   // Drones (C295)
-  if((pd.id==='c295' || pd.id==='f-golden') && drones.length>0){
+  if((pd.id==='c295' || pd.id==='f-22golden') && drones.length>0){
     droneAngle+=0.04;
     for(let di=0;di<drones.length;di++){
       const dr=drones[di];
@@ -1358,7 +1358,7 @@ function gameLoop() {
     e.x+=e.vx+Math.sin(frame*0.04+e.phase)*0.8;
     e.x=clamp(e.x,20,W-20);
 
-    const stl=(pd.id==='f22'||pd.id==='f37'||pd.id==='f-golden')&&stealthActive;
+    const stl=(pd.id==='f22'||pd.id==='f37'||pd.id==='f-22golden')&&stealthActive;
     if(Math.random()<e.shootRate*(stl?0.4:1)){
       const targetX=stl?player.x+rand(-100,100):player.x;
       const targetY=stl?player.y+rand(-80,80):player.y;
@@ -1401,7 +1401,7 @@ function gameLoop() {
           spawnParticle(e.x,e.y,e.color,18); sfxExplosion();
           spawnHpOrb(e.x, e.y);
           let sc=e.score*(1+level*0.05);
-          if(pd.id==='aviojeta' || pd.id==='f-golden') sc*=1.2;
+          if(pd.id==='aviojet' || pd.id==='f-22golden') sc*=1.2;
           score+=Math.floor(sc); kills++;
           enemies.splice(j,1); updateUI();
         }
@@ -1441,16 +1441,16 @@ function gameLoop() {
     orb.y+=orb.vy;
     // Draw
     const pulse=0.85+0.15*Math.sin(frame*0.15);
-    const r=10*pulse;
+    const r=18*pulse;
     ctx.save();
-    ctx.shadowColor='#ff6699'; ctx.shadowBlur=14;
-    ctx.fillStyle='#cc2255';
+    ctx.shadowColor='#44ff88'; ctx.shadowBlur=18;
+    ctx.fillStyle='#1a8c3a';
     ctx.beginPath(); ctx.arc(orb.x,orb.y,r,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#ff88bb';
+    ctx.fillStyle='#66ffaa';
     ctx.beginPath(); ctx.arc(orb.x,orb.y,r*0.55,0,Math.PI*2); ctx.fill();
     ctx.shadowBlur=0;
     ctx.fillStyle='#fff';
-    ctx.font='bold 9px monospace';
+    ctx.font='bold 12px monospace';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText('♥',orb.x,orb.y);
     ctx.restore();
@@ -1460,7 +1460,7 @@ function gameLoop() {
       hp=Math.min(hp+20,pd2.stats.maxHp);
       sfxHeal();
       showAbilityAnnounce('+20 HP');
-      spawnParticle(orb.x,orb.y,'#ff6699',10);
+      spawnParticle(orb.x,orb.y,'#44ff88',10);
       updateUI();
       hpOrbs.splice(i,1);
       continue;
@@ -1559,6 +1559,7 @@ function endGame() {
   document.getElementById('abilityBar').style.display='none';
   clearInterval(autoFireInterval); isFiring=false;
   stopMissionAudio();
+  unlockPlane('fcas');
   if(score>best){best=score;localStorage.setItem('skyBest',best);}
   document.getElementById('finalScore').textContent=score;
   document.getElementById('bestScore').textContent=t('record')+best;
@@ -1730,7 +1731,7 @@ function drawPlaneOnCtx(c, x, y, angle, color, scale, alpha, planeId) {
     c.beginPath(); c.moveTo(-6,2); c.lineTo(-22,16); c.lineTo(-14,20); c.lineTo(-2,10); c.closePath(); c.fill();
     c.beginPath(); c.moveTo(6,2); c.lineTo(22,16); c.lineTo(14,20); c.lineTo(2,10); c.closePath(); c.fill();
     c.beginPath(); c.moveTo(-3,14); c.lineTo(-8,24); c.lineTo(0,20); c.lineTo(8,24); c.lineTo(3,14); c.closePath(); c.fill();
-  } else if(pid==='aviojeta'){
+  } else if(pid==='aviojet'){
     c.fillStyle=c1; c.beginPath(); c.ellipse(0,0,6,18,0,0,Math.PI*2); c.fill();
     c.fillStyle=c2; c.beginPath(); c.moveTo(0,-18); c.lineTo(-3,-6); c.lineTo(3,-6); c.closePath(); c.fill();
     c.fillStyle=dk;
